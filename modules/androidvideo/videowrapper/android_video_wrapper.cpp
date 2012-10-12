@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <fcntl.h>
-
+#include <pthread.h>
+#include <unistd.h>
 
 #include <android/log.h>
 #define TAG "AndroidVideRecorder"
@@ -90,7 +91,7 @@ extern "C" void* prepareVideoRecorder(char* fileName, int width, int height)
     }
 
 	int fd = prepareFd(fileName);
-    if (fd == NULL)
+    if (fd < 0)
     {
         LOGV("Failed to create output file");
         delete context;
@@ -146,6 +147,24 @@ extern "C" void* prepareVideoRecorder(char* fileName, int width, int height)
 
 }
 
+
+void* destroyFunction(void* context)
+{
+    RecorderContext* recContext = (RecorderContext*) context;
+    ANativeWindow_Buffer bufferContainer;
+	ANativeWindow_Buffer* buffer = &bufferContainer;
+
+	LOGE("Destroy function is called");
+
+	/* Ugly workaround. Get rid of the sleep function */
+	sleep(1);
+
+	ANativeWindow_lock(recContext->nativeWindow, buffer, NULL);
+   	ANativeWindow_unlockAndPost(recContext->nativeWindow);
+
+	LOGE("Destroy fucntion finished");
+}
+
 extern "C" void destroyVideoRecorder(void* context)
 {
 
@@ -153,15 +172,23 @@ extern "C" void destroyVideoRecorder(void* context)
     RecorderContext* recContext = (RecorderContext*) context;
 
     LOGV("destroyVideoRecorder called\n");
+	/* This is an ugly workaround of the Android media recorder bug. It stop function may stuck forever because it would wait for
+	 * media source read function to return. But it would not return until one more frame would be available or stop method is called.
+	 * stop method is not available for our process and the only way is to put one more "dummy" frame.
+	 * Another thread is started, waits for some time and then put's one more frame
+	 */
+	pthread_t thread;
+	int tid = pthread_create(&thread, NULL, destroyFunction, context);
 
-
-    /* Now we can release native window */
-	ANativeWindow_release(recContext->nativeWindow);
-
-
+	/* Stop the media recorder */
 	status = recContext->mediaRecorder->stop();
 	LOGV("Media Recorder stop: %d\n", status);
 
+	/* Wait till workaround thread completes before releasing native window */
+	pthread_join(thread, NULL);
+
+    /* Now we can release native window */
+	ANativeWindow_release(recContext->nativeWindow);
 
 	status = recContext->mediaRecorder->release();
 	LOGV("Media Recorder release: %d\n", status);
