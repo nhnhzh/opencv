@@ -7,8 +7,7 @@
 #define TAG "AndroidVideRecorder"
 #define LOGV(...) __android_log_print(ANDROID_LOG_VERBOSE, TAG, __VA_ARGS__)
 
-
-#include <android/native_window.h>	
+#include <android/native_window.h>
 
 /*** Headers from the android buid, but not included into NDK */
 #include <binder/IServiceManager.h>
@@ -19,12 +18,12 @@
 #include <gui/ISurfaceTexture.h>
 #include <gui/SurfaceTextureClient.h>
 
-
 /*
 typedef void* (*prepareVideoRecorder_t)(char* fileName, int width, int height);
 typedef void (*destroyVideoRecorder_t)(void* context);
 typedef bool (*writeVideRecorderNextFrame_t)(void* context, char* buffer, int size);
 */
+
 using namespace android;
 
 class RecorderContext {
@@ -36,35 +35,20 @@ public:
     int fileDescriptor;
     sp<SurfaceTextureClient> surfaceClient;
     ANativeWindow* nativeWindow;
-    
-
 };
-
-int prepareFd(char* file_name)
-{
-	int fd;
-
-	fd = open(file_name, O_CREAT | O_WRONLY);
-
-	return  fd;
-}
-
 
 extern "C" void* prepareVideoRecorder(char* fileName, int width, int height)
 {
-
     status_t status;
     RecorderContext* context = new RecorderContext;
 
     LOGV("prepareVideoRecorder called\n");
 
-	sp<IServiceManager>  serviceManager = defaultServiceManager();
-	sp<IMediaPlayerService> mediaService;
+    sp<IServiceManager>  serviceManager = defaultServiceManager();
+    sp<IMediaPlayerService> mediaService;
 
-	getService(String16("media.player"), &mediaService);
-	sp<IMediaRecorder>  mediaRecorder = mediaService->createMediaRecorder(getpid());
-
-
+    getService(String16("media.player"), &mediaService);
+    sp<IMediaRecorder>  mediaRecorder = mediaService->createMediaRecorder(getpid());
 
     if (mediaRecorder == NULL)
     {
@@ -75,35 +59,33 @@ extern "C" void* prepareVideoRecorder(char* fileName, int width, int height)
     context->mediaRecorder = mediaRecorder;
 
     status = mediaRecorder->setVideoSource(VIDEO_SOURCE_GRALLOC_BUFFER);
-	LOGV("setVideoSource status: %d\n", status);
+    LOGV("setVideoSource status: %d\n", status);
     if (status)
     {
         delete context;
         return NULL;
     }
 
-	status = mediaRecorder->setOutputFormat(OUTPUT_FORMAT_MPEG_4);
-	LOGV("setOutputFormat status: %d\n", status);
+    status = mediaRecorder->setOutputFormat(OUTPUT_FORMAT_MPEG_4);
+    LOGV("setOutputFormat status: %d\n", status);
     if (status)
     {
         delete context;
         return NULL;
     }
 
-	int fd = prepareFd(fileName);
+    int fd = open(fileName, O_CREAT | O_WRONLY);
     if (fd < 0)
     {
         LOGV("Failed to create output file");
         delete context;
         return NULL;
-
     }
     context->fileDescriptor = fd;
 
-
-	status = mediaRecorder->setOutputFile(fd, 0, 0);
-	status = mediaRecorder->setVideoEncoder(VIDEO_ENCODER_MPEG_4_SP);
-	status = mediaRecorder->setVideoSize(width, height);
+    status = mediaRecorder->setOutputFile(fd, 0, 0);
+    status = mediaRecorder->setVideoEncoder(VIDEO_ENCODER_MPEG_4_SP);
+    status = mediaRecorder->setVideoSize(width, height);
 
     if (status)
     {
@@ -113,7 +95,7 @@ extern "C" void* prepareVideoRecorder(char* fileName, int width, int height)
         return NULL;
     }
 
-	status = mediaRecorder->prepare();
+    status = mediaRecorder->prepare();
     if (status)
     {
         LOGV("Failed to prepare recorder %d", status);
@@ -122,8 +104,8 @@ extern "C" void* prepareVideoRecorder(char* fileName, int width, int height)
         return NULL;
     }
 
-	status = mediaRecorder->start();
-	LOGV("Media Recorder start: %d\n", status);
+    status = mediaRecorder->start();
+    LOGV("Media Recorder start: %d\n", status);
     if (status)
     {
         LOGV("Failed to start recorder %d", status);
@@ -134,66 +116,67 @@ extern "C" void* prepareVideoRecorder(char* fileName, int width, int height)
     }
 
     /* Can this return NULL if all previous checks passed? */
-	sp<ISurfaceTexture> surfaceTexture = mediaRecorder->querySurfaceMediaSource();
-	context->surfaceClient = new SurfaceTextureClient(surfaceTexture);
+    sp<ISurfaceTexture> surfaceTexture = mediaRecorder->querySurfaceMediaSource();
+    context->surfaceClient = new SurfaceTextureClient(surfaceTexture);
 
-	context->nativeWindow = context->surfaceClient.get();
-	ANativeWindow_setBuffersGeometry(context->nativeWindow, ANativeWindow_getWidth(context->nativeWindow), ANativeWindow_getHeight(context->nativeWindow), WINDOW_FORMAT_RGBA_8888);
+    context->nativeWindow = context->surfaceClient.get();
+    ANativeWindow_setBuffersGeometry(context->nativeWindow, ANativeWindow_getWidth(context->nativeWindow), ANativeWindow_getHeight(context->nativeWindow), WINDOW_FORMAT_RGBA_8888);
 
     /* Aquire the native window. It will connect to the GUI server */
-	ANativeWindow_acquire(context->nativeWindow);
+    ANativeWindow_acquire(context->nativeWindow);
 
     return context;
-
 }
 
-
+// FIXME: Why return NULL? is return value realy needed?
 void* destroyFunction(void* context)
 {
     RecorderContext* recContext = (RecorderContext*) context;
     ANativeWindow_Buffer bufferContainer;
-	ANativeWindow_Buffer* buffer = &bufferContainer;
+    ANativeWindow_Buffer* buffer = &bufferContainer;
 
-	LOGE("Destroy function is called");
+    LOGE("Destroy function is called");
 
-	/* Ugly workaround. Get rid of the sleep function */
-	sleep(1);
+    // HACK: Ugly workaround. Get rid of the sleep function
+    sleep(1);
 
-	ANativeWindow_lock(recContext->nativeWindow, buffer, NULL);
-   	ANativeWindow_unlockAndPost(recContext->nativeWindow);
+    ANativeWindow_lock(recContext->nativeWindow, buffer, NULL);
+    ANativeWindow_unlockAndPost(recContext->nativeWindow);
 
-	LOGE("Destroy fucntion finished");
+    LOGE("Destroy fucntion finished");
+
+    return NULL;
 }
 
 extern "C" void destroyVideoRecorder(void* context)
 {
-
     status_t status;
     RecorderContext* recContext = (RecorderContext*) context;
 
     LOGV("destroyVideoRecorder called\n");
-	/* This is an ugly workaround of the Android media recorder bug. It stop function may stuck forever because it would wait for
-	 * media source read function to return. But it would not return until one more frame would be available or stop method is called.
-	 * stop method is not available for our process and the only way is to put one more "dummy" frame.
-	 * Another thread is started, waits for some time and then put's one more frame
-	 */
-	pthread_t thread;
-	int tid = pthread_create(&thread, NULL, destroyFunction, context);
 
-	/* Stop the media recorder */
-	status = recContext->mediaRecorder->stop();
-	LOGV("Media Recorder stop: %d\n", status);
+    /* HACK: This is an ugly workaround of the Android media recorder bug. It stop function may stuck forever because it would wait for
+     * media source read function to return. But it would not return until one more frame would be available or stop method is called.
+     * stop method is not available for our process and the only way is to put one more "dummy" frame.
+     * Another thread is started, waits for some time and then put's one more frame
+     */
+    pthread_t thread;
+    int tid = pthread_create(&thread, NULL, destroyFunction, context);
 
-	/* Wait till workaround thread completes before releasing native window */
-	pthread_join(thread, NULL);
+    /* Stop the media recorder */
+    status = recContext->mediaRecorder->stop();
+    LOGV("Media Recorder stop: %d\n", status);
+
+    /* Wait till workaround thread completes before releasing native window */
+    pthread_join(thread, NULL);
 
     /* Now we can release native window */
-	ANativeWindow_release(recContext->nativeWindow);
+    ANativeWindow_release(recContext->nativeWindow);
 
-	status = recContext->mediaRecorder->release();
-	LOGV("Media Recorder release: %d\n", status);
+    status = recContext->mediaRecorder->release();
+    LOGV("Media Recorder release: %d\n", status);
 
-	close(recContext->fileDescriptor);
+    close(recContext->fileDescriptor);
 
     delete recContext;
 }
@@ -203,18 +186,18 @@ extern "C" bool writeVideRecorderNextFrame(void* context, char* imageBuffer, int
     status_t status;
     RecorderContext* recContext = (RecorderContext*) context;
     ANativeWindow_Buffer bufferContainer;
-	ANativeWindow_Buffer* buffer = &bufferContainer;
-    
+    ANativeWindow_Buffer* buffer = &bufferContainer;
+
     if (ANativeWindow_lock(recContext->nativeWindow, buffer, NULL) >=  0)
     {
         int bpp;
         if (buffer != NULL)
         {
-            if (buffer->format == WINDOW_FORMAT_RGBA_8888 || buffer->format == WINDOW_FORMAT_RGBX_8888) 
+            if (buffer->format == WINDOW_FORMAT_RGBA_8888 || buffer->format == WINDOW_FORMAT_RGBX_8888)
             {
                 bpp = 4;
-            } 
-            else 
+            }
+            else
             {
                 bpp = 2;
             }
@@ -222,14 +205,14 @@ extern "C" bool writeVideRecorderNextFrame(void* context, char* imageBuffer, int
             if ((buffer->stride * buffer->height * bpp) < size)
             {
                 /* Too big data passed. May be simply ignore part of the buffer? */
-            	ANativeWindow_unlockAndPost(recContext->nativeWindow);
+                ANativeWindow_unlockAndPost(recContext->nativeWindow);
                 LOGV("Frame passed to recorder is bigger then the original size");
                 return false;
             }
             memcpy(buffer->bits, imageBuffer, size);
         }
 
-    	ANativeWindow_unlockAndPost(recContext->nativeWindow);
+        ANativeWindow_unlockAndPost(recContext->nativeWindow);
         return true;
 
     }
@@ -238,6 +221,3 @@ extern "C" bool writeVideRecorderNextFrame(void* context, char* imageBuffer, int
         return false;
     }
 }
-
-
-
