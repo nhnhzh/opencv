@@ -139,24 +139,24 @@ if(WITH_FFMPEG)
     endif(HAVE_FFMPEG)
   endif()
 
-  if(APPLE)
+  if(APPLE OR ANDROID)
     find_path(FFMPEG_INCLUDE_DIR "libavformat/avformat.h"
               PATHS /usr/local /usr /opt
               PATH_SUFFIXES include
               DOC "The path to FFMPEG headers")
     if(FFMPEG_INCLUDE_DIR)
       set(HAVE_GENTOO_FFMPEG TRUE)
-      set(FFMPEG_LIB_DIR "${FFMPEG_INCLUDE_DIR}/../lib" CACHE PATH "Full path of FFMPEG library directory")
-      if(EXISTS "${FFMPEG_LIB_DIR}/libavcodec.a")
+      set(FFMPEG_LIB_DIR "${FFMPEG_LIB_DIR}" CACHE PATH "Full path of FFMPEG library directory")
+      if(EXISTS "${FFMPEG_LIB_DIR}/libavcodec.so")
         set(HAVE_FFMPEG_CODEC 1)
         set(ALIASOF_libavcodec_VERSION "Unknown")
-        if(EXISTS "${FFMPEG_LIB_DIR}/libavformat.a")
+        if(EXISTS "${FFMPEG_LIB_DIR}/libavformat.so")
           set(HAVE_FFMPEG_FORMAT 1)
           set(ALIASOF_libavformat_VERSION "Unknown")
-          if(EXISTS "${FFMPEG_LIB_DIR}/libavutil.a")
+          if(EXISTS "${FFMPEG_LIB_DIR}/libavutil.so")
             set(HAVE_FFMPEG_UTIL 1)
             set(ALIASOF_libavutil_VERSION "Unknown")
-            if(EXISTS "${FFMPEG_LIB_DIR}/libswscale.a")
+            if(EXISTS "${FFMPEG_LIB_DIR}/libswscale.so")
               set(HAVE_FFMPEG_SWSCALE 1)
               set(ALIASOF_libswscale_VERSION "Unknown")
               set(HAVE_FFMPEG 1)
@@ -166,12 +166,20 @@ if(WITH_FFMPEG)
       endif()
     endif(FFMPEG_INCLUDE_DIR)
     if(HAVE_FFMPEG)
-      set(HIGHGUI_LIBRARIES ${HIGHGUI_LIBRARIES} "${FFMPEG_LIB_DIR}/libavcodec.a"
-          "${FFMPEG_LIB_DIR}/libavformat.a" "${FFMPEG_LIB_DIR}/libavutil.a"
-          "${FFMPEG_LIB_DIR}/libswscale.a")
+      set(HIGHGUI_LIBRARIES ${HIGHGUI_LIBRARIES}
+	"-L${FFMPEG_LIB_DIR}"
+	"avcodec"
+	"avformat"
+	"avutil"
+	"swscale"
+	"swresample"
+	"avfilter"
+	"avresample"
+	"postproc"
+	"log") # only for debuggon purposes now
       ocv_include_directories(${FFMPEG_INCLUDE_DIR})
     endif()
-  endif(APPLE)
+  endif(APPLE OR ANDROID)
 endif(WITH_FFMPEG)
 
 # --- VideoInput ---
