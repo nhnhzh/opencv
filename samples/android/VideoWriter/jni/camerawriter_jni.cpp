@@ -28,7 +28,7 @@ extern "C" JNIEXPORT void Java_org_opencv_sample_videowriter_VideoWriter_nativeS
     const char* filePath = env->GetStringUTFChars(jFileName, 0);
 
 
-    LOGE("Native Start recording is called");
+    LOGE("Native Start recording is called(%s)", filePath);
     videoWriter = cvCreateVideoWriter(filePath, 0, 30, frameSize);
     LOGE("Video Writer created: %p", videoWriter);
 
