@@ -1,7 +1,7 @@
 set(the_description "Auxiliary module for Android native video writer support")
 #set(OPENCV_MODULE_TYPE STATIC)
 
-ocv_define_module(androidvideo INTERNAL log dl)
+#ocv_define_module(androidvideo INTERNAL log dl)
 #ocv_include_directories("${CMAKE_CURRENT_SOURCE_DIR}/androidvideo")
 
 if(BUILD_ANDROID_VIDEO_WRAPPER)

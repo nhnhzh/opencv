@@ -2,10 +2,13 @@ SET (the_target androidvideo)
 
 project(${the_target})
 
-link_directories("${ANDROID_SOURCE_TREE}/out/target/product/generic/system/lib")
+link_directories("${ANDROID_SOURCE_TREE}/out/target/product/cardhu/system/lib")
 
 INCLUDE_DIRECTORIES(BEFORE
 	${ANDROID_SOURCE_TREE}
+	${ANDROID_SOURCE_TREE}/frameworks/native/opengl/include
+	${ANDROID_SOURCE_TREE}/frameworks/av/include
+	${ANDROID_SOURCE_TREE}/frameworks/native/include
 	${ANDROID_SOURCE_TREE}/frameworks/base/include/
 	${ANDROID_SOURCE_TREE}/system/core/include
 	${ANDROID_SOURCE_TREE}/hardware/libhardware/include
@@ -23,11 +26,11 @@ SET(CMAKE_CXX_FLAGS_RELEASE "")
 string(REPLACE "-O3" "" CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
 string(REPLACE "-O3" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 
-SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Os -fno-strict-aliasing -finline-limit=64 -fuse-cxa-atexit" )
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Os -fno-strict-aliasing -finline-limit=64 -fuse-cxa-atexit")
+SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Os -fno-strict-aliasing -finline-limit=64 -no-rtti -no-exceptions" )
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Os -fno-strict-aliasing -finline-limit=64 -fno-rtti -fno-exceptions")
 SET(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,noexecstack")
 
-ADD_LIBRARY(${the_target} SHARED android_video_wrapper.cpp )
+ADD_LIBRARY(${the_target} SHARED ${CMAKE_CURRENT_SOURCE_DIR}/android_video_wrapper.cpp )
 
 #string(REGEX REPLACE "[.]" "_" LIBRARY_DEF ${ANDROID_VERSION})
 
