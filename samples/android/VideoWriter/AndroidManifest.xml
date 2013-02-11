@@ -1,3 +1,4 @@
+<<<<<<< HEAD:samples/android/VideoWriter/AndroidManifest.xml
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="org.opencv.sample.videowriter"
     android:versionCode="1"
@@ -27,3 +28,36 @@
     </application>
 
 </manifest>
+=======
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="org.opencv.sample.videowriter"
+    android:versionCode="1"
+    android:versionName="1.0" >
+
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-feature android:name="android.hardware.camera" />
+    <uses-feature android:name="android.hardware.camera.autofocus" />
+    
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+
+    <uses-sdk
+        android:minSdkVersion="9"
+        android:targetSdkVersion="11" />
+
+    <application
+        android:icon="@drawable/ic_launcher"
+        android:label="@string/app_name"
+        android:theme="@style/AppTheme" >
+        <activity
+            android:name=".VideoWriterActivity"
+            android:label="@string/title_activity_video_writer" >
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>
+>>>>>>> Fixed Android vide writer and fixed sample to have permissions to write video file to the SDCard.:samples/android/video-writer/AndroidManifest.xml

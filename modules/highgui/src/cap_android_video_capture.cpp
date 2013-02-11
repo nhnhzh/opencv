@@ -255,6 +255,9 @@ bool AndroidVideoLibConnector::writeVideRecorderNextFrame(void* context, const I
         char* buffer = NULL;
         int size = 0;
 
+        size = image->imageSize;
+        buffer = (char*) image->imageData;
+
         /*TODO: Convert the image from IplImage to an array of bytes of the RGBA format and pass it to the library for recording */
         return writeRecorderNextFrame(context, buffer, size);
     }

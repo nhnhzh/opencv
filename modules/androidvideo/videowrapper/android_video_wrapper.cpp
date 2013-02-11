@@ -37,6 +37,16 @@ public:
     ANativeWindow* nativeWindow;
 };
 
+int prepareFd(char* file_name)
+{
+	int fd;
+
+	fd = open(file_name, O_CREAT | O_WRONLY);
+
+	return  fd;
+}
+
+
 extern "C" void* prepareVideoRecorder(char* fileName, int width, int height)
 {
     status_t status;
@@ -74,7 +84,7 @@ extern "C" void* prepareVideoRecorder(char* fileName, int width, int height)
         return NULL;
     }
 
-    int fd = open(fileName, O_CREAT | O_WRONLY);
+	int fd = prepareFd(fileName);
     if (fd < 0)
     {
         LOGV("Failed to create output file");

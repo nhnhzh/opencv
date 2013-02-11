@@ -99,7 +99,7 @@ public class VideoWriterActivity extends Activity implements SampleCvViewBase.Cv
         @Override
         public void surfaceChanged(SurfaceHolder holder, int format, int width,
                 int height) {
-            File baseDir = getFilesDir();
+            File baseDir = getVideoFileBaseDir();
             File path = new File(baseDir, VIDEO_FILE_NAME);
 
             try {
@@ -137,6 +137,9 @@ public class VideoWriterActivity extends Activity implements SampleCvViewBase.Cv
 
         mMode = VIDEO_MODE;
     }
+    public File getVideoFileBaseDir() {
+		return new File("/mnt/sdcard");
+	}
     private void stopVideoPlaybackMode() {
         mVideoSurface.setVisibility(View.GONE);
         mMode = NO_MODE;
@@ -149,13 +152,13 @@ public class VideoWriterActivity extends Activity implements SampleCvViewBase.Cv
     @Override
     public void onCameraViewStarted(int width, int height) {
         /* Camera preview started. Frames will start to be delivered soon. Create Video Writer */
-        File baseDir = getFilesDir();
+        File baseDir = getVideoFileBaseDir();
         File path = new File(baseDir, VIDEO_FILE_NAME);
 
         mWidth = width;
         mHeight = height;
 
-        mCameraWriter = new VideoWriter(VIDEO_FILE_NAME/*path.toString()*/, width, height);
+        mCameraWriter = new VideoWriter(path.toString(), width, height);
         mCameraWriter.startRecording();
     }
 
