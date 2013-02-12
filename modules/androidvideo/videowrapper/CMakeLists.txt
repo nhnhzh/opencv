@@ -2,7 +2,7 @@ SET (the_target androidvideo)
 
 project(${the_target})
 
-link_directories("${ANDROID_SOURCE_TREE}/out/target/product/cardhu/system/lib")
+link_directories("${ANDROID_SOURCE_TREE}/out/target/product/generic/system/lib")
 
 INCLUDE_DIRECTORIES(BEFORE
 	${ANDROID_SOURCE_TREE}
@@ -34,7 +34,7 @@ ADD_LIBRARY(${the_target} SHARED ${CMAKE_CURRENT_SOURCE_DIR}/android_video_wrapp
 
 #string(REGEX REPLACE "[.]" "_" LIBRARY_DEF ${ANDROID_VERSION})
 
-target_link_libraries(${the_target} c m dl utils camera_client binder media log android)
+target_link_libraries(${the_target} c m dl utils camera_client binder media log android gui)
 
 if(NOT ANDROID_VERSION VERSION_LESS "3.0.0")
     target_link_libraries(${the_target} gui )

@@ -19,7 +19,7 @@ import android.view.View;
 
 public class VideoWriterActivity extends Activity implements SampleCvViewBase.CvCameraViewListener, MediaPlayer.OnCompletionListener {
 
-    private String VIDEO_FILE_NAME = "/mnt/sdcard/video.mp4";
+    private String VIDEO_FILE_NAME = "video.mp4";
     private VideoWriter mCameraWriter;
     SampleCvViewBase mCameraView;
     SurfaceView mVideoSurface;

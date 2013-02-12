@@ -24,6 +24,32 @@ typedef void (*destroyVideoRecorder_t)(void* context);
 typedef bool (*writeVideRecorderNextFrame_t)(void* context, char* buffer, int size);
 */
 
+//undef logging macro from /system/core/libcutils/loghack.h
+#ifdef LOGD
+# undef LOGD
+#endif
+
+#ifdef LOGI
+# undef LOGI
+#endif
+
+#ifdef LOGW
+# undef LOGW
+#endif
+
+#ifdef LOGE
+# undef LOGE
+#endif
+
+
+// LOGGING
+#include <android/log.h>
+#define CAMERA_LOG_TAG "OpenCV_NativeCamera"
+#define LOGD(...) ((void)__android_log_print(ANDROID_LOG_DEBUG, CAMERA_LOG_TAG, __VA_ARGS__))
+#define LOGI(...) ((void)__android_log_print(ANDROID_LOG_INFO, CAMERA_LOG_TAG, __VA_ARGS__))
+#define LOGW(...) ((void)__android_log_print(ANDROID_LOG_WARN, CAMERA_LOG_TAG, __VA_ARGS__))
+#define LOGE(...) ((void)__android_log_print(ANDROID_LOG_ERROR, CAMERA_LOG_TAG, __VA_ARGS__))
+
 using namespace android;
 
 class RecorderContext {

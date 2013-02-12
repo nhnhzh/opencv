@@ -11,7 +11,7 @@ else()
   set(video_wrapper "${CMAKE_CURRENT_SOURCE_DIR}/../../3rdparty/lib/${ANDROID_NDK_ABI_NAME}/libandroidvideo.so")
 
   ADD_CUSTOM_COMMAND(
-    TARGET ${the_module} POST_BUILD
+    TARGET androidvideo POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy "${video_wrapper}" "${LIBRARY_OUTPUT_PATH}"
   )
 
