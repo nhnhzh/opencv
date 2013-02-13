@@ -1,5 +1,5 @@
 set(the_description "High-level GUI and Media I/O")
-ocv_add_module(highgui opencv_imgproc OPTIONAL opencv_androidcamera)
+ocv_add_module(highgui opencv_imgproc OPTIONAL opencv_androidcamera opencv_androidvideo)
 
 # ----------------------------------------------------------------------------
 #  CMake file for highgui. See root CMakeLists.txt
@@ -142,12 +142,13 @@ if(HAVE_OPENNI)
 endif(HAVE_OPENNI)
 
 if(HAVE_opencv_androidcamera)
-  list(APPEND highgui_srcs src/cap_android.cpp)
-  add_definitions(-DHAVE_ANDROID_NATIVE_CAMERA)#TODO: remove this line
+  list(APPEND highgui_srcs src/cap_android_camera.cpp)
+  add_definitions(-DHAVE_ANDROID_NATIVE_CAMERA)
 endif(HAVE_opencv_androidcamera)
 
-#TODO: need define
-list(APPEND highgui_srcs src/cap_android_video_capture.cpp)
+if(HAVE_opencv_androidvideo)
+  list(APPEND highgui_srcs src/cap_android_video.cpp)
+endif(HAVE_opencv_androidvideo)
 
 if(HAVE_XIMEA)
   list(APPEND highgui_srcs src/cap_ximea.cpp)

@@ -663,11 +663,21 @@ endif(DEFINED WITH_1394)
 if(ANDROID)
   if(HAVE_opencv_androidcamera)
     status("    AndroidNativeCamera:" BUILD_ANDROID_CAMERA_WRAPPER
-                                                   THEN "YES, build for Android${ANDROID_VERSION}" ELSE "YES, use prebuilt libraries")
+                                                   THEN "YES, build for Android ${ANDROID_VERSION}" ELSE "YES, use prebuilt libraries")
   else()
     status("    AndroidNativeCamera:" "NO (native camera requires Android API level 8 or higher)")
   endif()
 endif()
+
+if(ANDROID)
+  if(HAVE_opencv_androidvideo)
+    status("    AndroidVideoWriter:" BUILD_ANDROID_VIDEO_WRAPPER
+                                                   THEN "YES, build for Android ${ANDROID_VERSION}" ELSE "YES, use prebuilt libraries")
+  else()
+    status("    AndroidVideoWriter:" "NO (native VideoWriter requires Android API level 8 or higher)")
+  endif()
+endif()
+
 
 if(DEFINED WITH_AVFOUNDATION)
   status("    AVFoundation:"   WITH_AVFOUNDATION   THEN YES                                        ELSE NO)

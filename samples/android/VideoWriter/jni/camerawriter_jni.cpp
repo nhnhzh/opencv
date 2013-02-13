@@ -19,9 +19,7 @@ jfieldID nativeObjId;
 
 using namespace cv;
 
-
-
-extern "C" JNIEXPORT void Java_org_opencv_sample_videowriter_VideoWriter_nativeStartRecording( JNIEnv* env, jobject thiz, 
+extern "C" JNIEXPORT void Java_org_opencv_sample_videowriter_VideoWriter_nativeStartRecording( JNIEnv* env, jobject,
                                                                       jstring jFileName, jint width, jint height)
 {
     CvSize frameSize = {width, height};
@@ -36,7 +34,7 @@ extern "C" JNIEXPORT void Java_org_opencv_sample_videowriter_VideoWriter_nativeS
 
 }
 
-extern "C" JNIEXPORT void Java_org_opencv_sample_videowriter_VideoWriter_nativeWriteNextFrame( JNIEnv* env, jobject thiz, jlong matObject)
+extern "C" JNIEXPORT void Java_org_opencv_sample_videowriter_VideoWriter_nativeWriteNextFrame( JNIEnv*, jobject, jlong matObject)
 {
     Mat* nativeMat;
     IplImage* image;
@@ -56,7 +54,7 @@ extern "C" JNIEXPORT void Java_org_opencv_sample_videowriter_VideoWriter_nativeW
 
 }
 
-extern "C" JNIEXPORT void Java_org_opencv_sample_videowriter_VideoWriter_nativeStopRecording( JNIEnv* env, jobject thiz)
+extern "C" JNIEXPORT void Java_org_opencv_sample_videowriter_VideoWriter_nativeStopRecording( JNIEnv*, jobject)
 {
     LOGE("Native stop recording is called");
     if (videoWriter != NULL) {

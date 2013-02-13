@@ -3,10 +3,6 @@
 #include <pthread.h>
 #include <unistd.h>
 
-#include <android/log.h>
-#define TAG "AndroidVideRecorder"
-#define LOGV(...) __android_log_print(ANDROID_LOG_VERBOSE, TAG, __VA_ARGS__)
-
 #include <android/native_window.h>
 
 /*** Headers from the android buid, but not included into NDK */
@@ -44,11 +40,12 @@ typedef bool (*writeVideRecorderNextFrame_t)(void* context, char* buffer, int si
 
 // LOGGING
 #include <android/log.h>
-#define CAMERA_LOG_TAG "OpenCV_NativeCamera"
-#define LOGD(...) ((void)__android_log_print(ANDROID_LOG_DEBUG, CAMERA_LOG_TAG, __VA_ARGS__))
-#define LOGI(...) ((void)__android_log_print(ANDROID_LOG_INFO, CAMERA_LOG_TAG, __VA_ARGS__))
-#define LOGW(...) ((void)__android_log_print(ANDROID_LOG_WARN, CAMERA_LOG_TAG, __VA_ARGS__))
-#define LOGE(...) ((void)__android_log_print(ANDROID_LOG_ERROR, CAMERA_LOG_TAG, __VA_ARGS__))
+#define VIDEO_LOG_TAG "OpenCV_NativeCamera"
+#define LOGD(...) ((void)__android_log_print(ANDROID_LOG_DEBUG, VIDEO_LOG_TAG, __VA_ARGS__))
+#define LOGI(...) ((void)__android_log_print(ANDROID_LOG_INFO, VIDEO_LOG_TAG, __VA_ARGS__))
+#define LOGW(...) ((void)__android_log_print(ANDROID_LOG_WARN, VIDEO_LOG_TAG, __VA_ARGS__))
+#define LOGE(...) ((void)__android_log_print(ANDROID_LOG_ERROR, VIDEO_LOG_TAG, __VA_ARGS__))
+#define LOGV(...) ((void)__android_log_print(ANDROID_LOG_VERBOSE, VIDEO_LOG_TAG, __VA_ARGS__))
 
 using namespace android;
 
@@ -65,13 +62,10 @@ public:
 
 int prepareFd(char* file_name)
 {
-	int fd;
-
-	fd = open(file_name, O_CREAT | O_WRONLY);
-
-	return  fd;
+    int fd;
+    fd = open(file_name, O_CREAT | O_WRONLY);
+    return  fd;
 }
-
 
 extern "C" void* prepareVideoRecorder(char* fileName, int width, int height)
 {
@@ -110,7 +104,7 @@ extern "C" void* prepareVideoRecorder(char* fileName, int width, int height)
         return NULL;
     }
 
-	int fd = prepareFd(fileName);
+    int fd = prepareFd(fileName);
     if (fd < 0)
     {
         LOGV("Failed to create output file");
