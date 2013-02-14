@@ -2,6 +2,7 @@
 #define _VIDEOCONNECTOR_H_
 
 #include <string>
+#include <vector>
 #include <opencv2/core/core.hpp>
 
 #define DEFAULT_WRAPPER_PACKAGE_NAME "org.itseez.opencv"
@@ -38,6 +39,8 @@ private:
     AndroidVideoLibConnector();
 
     std::string getPathLibFolder();
+    void fillListWrapperLibs(const std::string& folderPath, std::vector<std::string>& listLibs);
+    std::string getDefaultPathLibFolder();
     void* getSymbolAdress(const char* name);
 
     std::string pathLibFolder;

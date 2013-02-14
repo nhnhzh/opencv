@@ -12,15 +12,14 @@
 #include "camera_wrapper.h"
 #include "EngineCommon.h"
 
-#undef LOG_TAG
 #undef LOGE
 #undef LOGD
 #undef LOGI
 
-#define LOG_TAG "OpenCV::camera"
-#define LOGE(...) ((void)__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__))
-#define LOGD(...) ((void)__android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__))
-#define LOGI(...) ((void)__android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__))
+#define CAMERA_LOG_TAG "OpenCV::camera"
+#define LOGE(...) ((void)__android_log_print(ANDROID_LOG_ERROR, CAMERA_LOG_TAG, __VA_ARGS__))
+#define LOGD(...) ((void)__android_log_print(ANDROID_LOG_DEBUG, CAMERA_LOG_TAG, __VA_ARGS__))
+#define LOGI(...) ((void)__android_log_print(ANDROID_LOG_INFO, CAMERA_LOG_TAG, __VA_ARGS__))
 
 ///////
 // Debug
@@ -240,7 +239,8 @@ CameraActivity::ErrorCode CameraWrapperConnector::getSymbolFromLib(void* libHand
     *(void **) (ppSymbol)=dlsym(libHandle, symbolName);
 
     const char* error_dlsym_init=dlerror();
-    if (error_dlsym_init) {
+    if (error_dlsym_init)
+    {
         LOGE("CameraWrapperConnector::getSymbolFromLib ERROR: cannot get symbol of the function '%s' from the camera wrapper library, dlerror=\"%s\"",
              symbolName, error_dlsym_init);
         return CameraActivity::ERROR_CANNOT_GET_FUNCTION_FROM_CAMERA_WRAPPER_LIB;

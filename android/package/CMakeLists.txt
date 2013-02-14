@@ -67,8 +67,15 @@ set(APK_NAME "${PACKAGE_DIR}/bin/${target_name}-release-unsigned.apk")
 file(GLOB camera_wrappers "${OpenCV_SOURCE_DIR}/3rdparty/lib/${ANDROID_NDK_ABI_NAME}/libnative_camera_r*.so")
 set(CAMERA_LIB_COMMANDS "")
 
+file(GLOB video_wrappers "${OpenCV_SOURCE_DIR}/3rdparty/lib/${ANDROID_NDK_ABI_NAME}/libnative_video_r*.so")
+set(VIDEO_LIB_COMMANDS "")
+
 foreach(wrapper ${camera_wrappers})
   list(APPEND CAMERA_LIB_COMMANDS COMMAND ${CMAKE_COMMAND} -E copy "${wrapper}" "${PACKAGE_DIR}/libs/${ANDROID_NDK_ABI_NAME}/")
+endforeach()
+
+foreach(wrapper ${video_wrappers})
+  list(APPEND VIDEO_LIB_COMMANDS COMMAND ${CMAKE_COMMAND} -E copy "${wrapper}" "${PACKAGE_DIR}/libs/${ANDROID_NDK_ABI_NAME}/")
 endforeach()
 
 add_custom_command(
@@ -80,6 +87,7 @@ add_custom_command(
          COMMAND ${CMAKE_COMMAND} -E make_directory "${PACKAGE_DIR}/src"
          COMMAND ${CMAKE_COMMAND} -E make_directory "${PACKAGE_DIR}/libs/${ANDROID_NDK_ABI_NAME}/"
          ${CAMERA_LIB_COMMANDS}
+         ${VIDEO_LIB_COMMANDS}
          COMMAND ${CMAKE_COMMAND} -E copy "${opencv_java_location}" "${PACKAGE_DIR}/libs/${ANDROID_NDK_ABI_NAME}/"
          COMMAND ${ANDROID_EXECUTABLE} --silent update project --path "${PACKAGE_DIR}" --target "${android_proj_sdk_target}" --name "${target_name}"
          COMMAND ${ANT_EXECUTABLE} -q -noinput -k release

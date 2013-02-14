@@ -1,14 +1,26 @@
 #include "video_connector.hpp"
 
-#include <android/log.h>
 #include <dlfcn.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <dirent.h>
+#include <android/log.h>
 
-#if !defined(LOGD) && !defined(LOGI) && !defined(LOGE)
-#define LOG_TAG "CV_WRITER_ANDROID"
-#define LOGD(...) ((void)__android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__))
-#define LOGI(...) ((void)__android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__))
-#define LOGE(...) ((void)__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__))
-#endif
+#include "EngineCommon.h"
+#include <opencv2/core/version.hpp>
+
+using namespace std;
+
+#undef LOGE
+#undef LOGD
+#undef LOGI
+
+#define VIDEO_LOG_TAG "OpenCV::video"
+#define LOGD(...) ((void)__android_log_print(ANDROID_LOG_DEBUG, VIDEO_LOG_TAG, __VA_ARGS__))
+#define LOGI(...) ((void)__android_log_print(ANDROID_LOG_INFO, VIDEO_LOG_TAG, __VA_ARGS__))
+#define LOGE(...) ((void)__android_log_print(ANDROID_LOG_ERROR, VIDEO_LOG_TAG, __VA_ARGS__))
+
+#define PREFIX_VIDEO_WRAPPER_LIB "libnative_video"
 
 AndroidVideoLibConnector* AndroidVideoLibConnector::sInstance = NULL;
 
@@ -31,23 +43,64 @@ bool AndroidVideoLibConnector::connectToLib()
     if (mIsConnected) return true;
 
     /* Not connected yet. Need to connect and initalize */
-    std::string cur_path = pathLibFolder + ANDROID_VIDEO_LIBRARY_NAME;
-    LOGD("try to load library '%s'", cur_path.c_str());
-    libHandle = dlopen(cur_path.c_str(), RTLD_LAZY);
-    if (libHandle) {
-        LOGD("Loaded library '%s'", cur_path.c_str());
-        mIsConnected = true;
-        /* Now get the functions from the library: PREPARE, WRITE_FRAME, STOP */
-        /*TODO: Check that all symbols are present */
-        prepareRecorder = (prepareVideoRecorder_t)getSymbolAdress("prepareVideoRecorder");
-        destroyRecorder = (destroyVideoRecorder_t)getSymbolAdress("destroyVideoRecorder");
-        writeRecorderNextFrame = (writeVideRecorderNextFrame_t)getSymbolAdress("writeVideRecorderNextFrame");
-        return true;
+    std::string folderPath = getPathLibFolder();
+    if (folderPath.empty())
+    {
+        LOGD("Trying to find native video in default OpenCV packages");
+        folderPath = getDefaultPathLibFolder();
+    }
 
-    } else {
-        LOGD("AndroidVideoLibConnector::connectToLib ERROR: cannot dlopen video library %s, dlerror=\"%s\"",
-             cur_path.c_str(), dlerror());
+    LOGD("VideoWrapperConnector::connectToLib: folderPath=%s", folderPath.c_str());
+
+    vector<string> listLibs;
+    fillListWrapperLibs(folderPath, listLibs);
+    std::sort(listLibs.begin(), listLibs.end(), std::greater<string>());
+
+    string cur_path;
+    for(size_t i = 0; i < listLibs.size(); i++) {
+        cur_path=folderPath + listLibs[i];
+        LOGD("try to load library '%s'", listLibs[i].c_str());
+        libHandle = dlopen(cur_path.c_str(), RTLD_LAZY);
+        if (libHandle) {
+            LOGD("Loaded library '%s'", cur_path.c_str());
+            break;
+        } else {
+            LOGD("VideoWrapperConnector::connectToLib ERROR: cannot dlopen video wrapper library %s, dlerror=\"%s\"",
+                 cur_path.c_str(), dlerror());
+        }
+    }
+
+    if (!libHandle) {
+        LOGE("VideoWrapperConnector::connectToLib ERROR: cannot dlopen video wrapper library");
         return false;
+    }
+
+    /* Now get the functions from the library: PREPARE, WRITE_FRAME, STOP */
+    prepareRecorder = (prepareVideoRecorder_t)getSymbolAdress("prepareVideoRecorder");
+    destroyRecorder = (destroyVideoRecorder_t)getSymbolAdress("destroyVideoRecorder");
+    writeRecorderNextFrame = (writeVideRecorderNextFrame_t)getSymbolAdress("writeVideRecorderNextFrame");
+
+    mIsConnected = (prepareRecorder && destroyRecorder && writeRecorderNextFrame);
+
+    return mIsConnected;
+}
+
+void AndroidVideoLibConnector::fillListWrapperLibs(const string& folderPath, vector<string>& listLibs)
+{
+    DIR *dp;
+    struct dirent *ep;
+
+    dp = opendir (folderPath.c_str());
+    if (dp != NULL)
+    {
+        while ((ep = readdir (dp))) {
+            const char* cur_name=ep->d_name;
+            if (strstr(cur_name, PREFIX_VIDEO_WRAPPER_LIB)) {
+                listLibs.push_back(cur_name);
+                LOGE("||%s", cur_name);
+            }
+        }
+        (void) closedir (dp);
     }
 }
 
@@ -57,12 +110,39 @@ void* AndroidVideoLibConnector::getSymbolAdress(const char* symbolName)
     void * pSymbol = dlsym(libHandle, symbolName);
 
     const char* error_dlsym_init=dlerror();
-    if (error_dlsym_init) {
+    if (error_dlsym_init)
+    {
         LOGE("AndroidVideoLibConnector::getSymbolFromLib ERROR: cannot get symbol of the function '%s' from the camera wrapper library, dlerror=\"%s\"",
              symbolName, error_dlsym_init);
         return NULL;
     }
     return pSymbol;
+}
+
+std::string AndroidVideoLibConnector::getDefaultPathLibFolder()
+{
+    #define BIN_PACKAGE_NAME(x) "org.opencv.lib_v" CVAUX_STR(CV_VERSION_EPOCH) CVAUX_STR(CV_VERSION_MAJOR) "_" x
+    const char* const packageList[] = {BIN_PACKAGE_NAME("armv7a"), OPENCV_ENGINE_PACKAGE};
+    for (size_t i = 0; i < sizeof(packageList)/sizeof(packageList[0]); i++)
+    {
+        char path[128];
+        sprintf(path, "/data/data/%s/lib/", packageList[i]);
+        LOGD("Trying package \"%s\" (\"%s\")", packageList[i], path);
+
+        DIR* dir = opendir(path);
+        if (!dir)
+        {
+            LOGD("Package not found");
+            continue;
+        }
+        else
+        {
+            closedir(dir);
+            return path;
+        }
+    }
+
+    return string();
 }
 
 void probeFunction();
@@ -138,7 +218,6 @@ std::string AndroidVideoLibConnector::getPathLibFolder()
 
     return DEFAULT_PATH_LIB_FOLDER ;
 }
-
 
 void* AndroidVideoLibConnector::prepareVideoRecorder(char* fileName, int width, int height)
 {
