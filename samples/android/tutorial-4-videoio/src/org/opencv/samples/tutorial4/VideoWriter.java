@@ -1,4 +1,4 @@
-package org.opencv.sample.videowriter;
+package org.opencv.samples.tutorial4;
 
 import org.opencv.core.Mat;
 
@@ -11,39 +11,29 @@ import android.util.Log;
  * After stop recording is called, the file is closed and VideoWriter object can't be used anymore.
  * To start writing new file - new object to be created.
  */
-public class VideoWriter  {
+public class VideoWriter {
 
     private static final String TAG = "VideoWriter";
 
-    private static boolean sInitialized = false;
-
     private String mFileName;
-
     private int mWidth;
     private int mHeight;
+
+    public boolean mIsWriting = false;
 
     public VideoWriter(String fileName, int width, int height) {
         mFileName = fileName;
         mWidth = width;
         mHeight = height;
-
-        if (!sInitialized) {
-            try {
-            System.loadLibrary("androidvideo");
-            System.loadLibrary("camerawriter_jni");
-            sInitialized = true;
-            } catch (UnsatisfiedLinkError ex) {
-                Log.e(TAG, "Can't load camerawriter_jni library", ex);
-            }
-        }
     }
 
     public synchronized  void startRecording() {
-
+        mIsWriting = true;
         nativeStartRecording(mFileName, mWidth, mHeight);
     }
 
     public synchronized void stopRecording() {
+        mIsWriting = false;
         nativeStopRecording();
     }
 
