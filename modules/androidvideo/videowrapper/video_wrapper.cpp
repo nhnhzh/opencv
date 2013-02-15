@@ -60,13 +60,6 @@ public:
     ANativeWindow* nativeWindow;
 };
 
-int prepareFd(char* file_name)
-{
-    int fd;
-    fd = open(file_name, O_CREAT | O_WRONLY);
-    return  fd;
-}
-
 extern "C" void* prepareVideoRecorder(char* fileName, int width, int height)
 {
     status_t status;
@@ -74,7 +67,7 @@ extern "C" void* prepareVideoRecorder(char* fileName, int width, int height)
 
     LOGV("prepareVideoRecorder called\n");
 
-    sp<IServiceManager>  serviceManager = defaultServiceManager();
+    sp<IServiceManager> serviceManager = defaultServiceManager();
     sp<IMediaPlayerService> mediaService;
 
     getService(String16("media.player"), &mediaService);
@@ -104,7 +97,7 @@ extern "C" void* prepareVideoRecorder(char* fileName, int width, int height)
         return NULL;
     }
 
-    int fd = prepareFd(fileName);
+    int fd = open(fileName, O_CREAT | O_WRONLY);
     if (fd < 0)
     {
         LOGV("Failed to create output file");
@@ -150,7 +143,8 @@ extern "C" void* prepareVideoRecorder(char* fileName, int width, int height)
     context->surfaceClient = new SurfaceTextureClient(surfaceTexture);
 
     context->nativeWindow = context->surfaceClient.get();
-    ANativeWindow_setBuffersGeometry(context->nativeWindow, ANativeWindow_getWidth(context->nativeWindow), ANativeWindow_getHeight(context->nativeWindow), WINDOW_FORMAT_RGBA_8888);
+    ANativeWindow_setBuffersGeometry(context->nativeWindow, ANativeWindow_getWidth(context->nativeWindow),
+                                     ANativeWindow_getHeight(context->nativeWindow), WINDOW_FORMAT_RGBA_8888);
 
     /* Aquire the native window. It will connect to the GUI server */
     ANativeWindow_acquire(context->nativeWindow);
@@ -173,7 +167,7 @@ void* destroyFunction(void* context)
     ANativeWindow_lock(recContext->nativeWindow, buffer, NULL);
     ANativeWindow_unlockAndPost(recContext->nativeWindow);
 
-    LOGE("Destroy fucntion finished");
+    LOGE("Destroy function finished");
 
     return NULL;
 }
