@@ -12,7 +12,7 @@ class_ignore_list = (
     #core
     "FileNode", "FileStorage", "KDTree",
     #highgui
-    "VideoWriter", "VideoCapture",
+    "VideoCapture",
 )
 
 const_ignore_list = (

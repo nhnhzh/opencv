@@ -148,6 +148,7 @@ endif(HAVE_opencv_androidcamera)
 
 if(HAVE_opencv_androidvideo)
   list(APPEND highgui_srcs src/cap_android_video.cpp)
+  add_definitions(-DHAVE_ANDROID_NATIVE_VIDEO)
 endif(HAVE_opencv_androidvideo)
 
 if(HAVE_XIMEA)

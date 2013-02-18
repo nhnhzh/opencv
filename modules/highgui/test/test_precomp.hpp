@@ -60,6 +60,7 @@
     defined(HAVE_QUICKTIME)    || \
     defined(HAVE_AVFOUNDATION) || \
     defined(HAVE_FFMPEG)       || \
+    defined(HAVE_ANDROID_NATIVE_VIDEO) || \
     defined(WIN32) /* assume that we have ffmpeg */
 #  define BUILD_WITH_VIDEO_OUTPUT_SUPPORT 1
 #else

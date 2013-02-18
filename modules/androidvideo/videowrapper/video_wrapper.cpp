@@ -89,7 +89,7 @@ extern "C" void* prepareVideoRecorder(char* fileName, int width, int height)
         return NULL;
     }
 
-    status = mediaRecorder->setOutputFormat(OUTPUT_FORMAT_MPEG_4);
+    status = mediaRecorder->setOutputFormat(VIDEO_ENCODER_DEFAULT);
     LOGV("setOutputFormat status: %d\n", status);
     if (status)
     {

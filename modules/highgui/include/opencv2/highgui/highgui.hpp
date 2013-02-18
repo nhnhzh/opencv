@@ -229,17 +229,18 @@ class CV_EXPORTS_W VideoWriter
 {
 public:
     CV_WRAP VideoWriter();
-    CV_WRAP VideoWriter(const string& filename, int fourcc, double fps,
+    CV_WRAP VideoWriter(const string& filename, int fourcc_code, double fps,
                 Size frameSize, bool isColor=true);
 
     virtual ~VideoWriter();
-    CV_WRAP virtual bool open(const string& filename, int fourcc, double fps,
+    CV_WRAP virtual bool open(const string& filename, int fourcc_code, double fps,
                       Size frameSize, bool isColor=true);
     CV_WRAP virtual bool isOpened() const;
     CV_WRAP virtual void release();
     virtual VideoWriter& operator << (const Mat& image);
     CV_WRAP virtual void write(const Mat& image);
-
+    CV_WRAP static int fourcc(char c1, char c2, char c3, char c4);
+    CV_WRAP static int fourcc(const string& cc);
 protected:
     Ptr<CvVideoWriter> writer;
 };
