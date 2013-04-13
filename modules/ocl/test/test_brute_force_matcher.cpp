@@ -189,8 +189,8 @@ namespace
         testing::Combine(
         testing::Values(
             DistType(cv::ocl::BruteForceMatcher_OCL_base::L1Dist),
-            DistType(cv::ocl::BruteForceMatcher_OCL_base::L2Dist), 
-            DistType(cv::ocl::BruteForceMatcher_OCL_base::HammingDist)
+            DistType(cv::ocl::BruteForceMatcher_OCL_base::L2Dist)/*, 
+            DistType(cv::ocl::BruteForceMatcher_OCL_base::HammingDist)*/
         ),
         testing::Values(
             DescriptorSize(57), 

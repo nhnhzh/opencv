@@ -65,11 +65,10 @@
 int bit1Count(int x)
 {
     int c = 0;
-    int ix = x;
     for (int i = 0 ; i < 32 ; i++)
     {
-        c += ix & 0x1;
-        ix >>= 1;
+        c += x & 1;
+        x >>= 1;
     }
     return c;
 }
