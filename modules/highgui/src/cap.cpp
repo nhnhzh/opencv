@@ -201,9 +201,7 @@ CV_IMPL CvCapture * cvCreateCameraCapture (int index)
         {
 #ifdef HAVE_MSMF
         case CV_CAP_MSMF:
-             printf("Creating Media foundation capture\n");
              capture = cvCreateCameraCapture_MSMF (index);
-             printf("Capture address %p\n", capture);
              if (capture)
                  return capture;
             break;
@@ -365,11 +363,7 @@ CV_IMPL CvCapture * cvCreateFileCapture (const char * filename)
 
 #ifdef HAVE_MSMF
     if (! result)
-    {
-        printf("Creating Media foundation based reader\n");
         result = cvCreateFileCapture_MSMF (filename);
-        printf("Construction result %p\n", result);
-    }
 #endif
 
 #ifdef HAVE_VFW
@@ -427,14 +421,14 @@ CV_IMPL CvVideoWriter* cvCreateVideoWriter( const char* filename, int fourcc,
         result = cvCreateVideoWriter_FFMPEG_proxy (filename, fourcc, fps, frameSize, is_color);
 #endif
 
-#ifdef HAVE_VFW
-    if(!result)
-     return cvCreateVideoWriter_VFW(filename, fourcc, fps, frameSize, is_color);
-#endif
-
 #ifdef HAVE_MSMF
     if (!result)
         result = cvCreateVideoWriter_MSMF(filename, fourcc, fps, frameSize, is_color);
+#endif
+
+#ifdef HAVE_VFW
+    if(!result)
+        result = cvCreateVideoWriter_VFW(filename, fourcc, fps, frameSize, is_color);
 #endif
 
 /*  #ifdef HAVE_XINE
