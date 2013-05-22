@@ -1,12 +1,19 @@
 #Cross compile TBB from source
 project(tbb)
 
-# 4.1 update 3 dev - works fine
-set(tbb_ver "tbb41_20130401oss")
-set(tbb_url "http://threadingbuildingblocks.org/sites/default/files/software_releases/source/tbb41_20130401oss_src.tgz")
-set(tbb_md5 "f2f591a0d2ca8f801e221ce7d9ea84bb")
+# Development release
+set(tbb_ver "tbb41_20130516oss")
+set(tbb_url "http://threadingbuildingblocks.org/sites/default/files/software_releases/source/tbb41_20130516oss_src.tgz")
+set(tbb_md5 "08c14d1c196bc9595d8c52bedc239937")
 set(tbb_version_file "version_string.ver")
 ocv_warnings_disable(CMAKE_CXX_FLAGS -Wshadow)
+
+# 4.1 update 3 dev - works fine
+#set(tbb_ver "tbb41_20130401oss")
+#set(tbb_url "http://threadingbuildingblocks.org/sites/default/files/software_releases/source/tbb41_20130401oss_src.tgz")
+#set(tbb_md5 "f2f591a0d2ca8f801e221ce7d9ea84bb")
+#set(tbb_version_file "version_string.ver")
+#ocv_warnings_disable(CMAKE_CXX_FLAGS -Wshadow)
 
 # 4.1 update 2 - works fine
 #set(tbb_ver "tbb41_20130116oss")
@@ -133,12 +140,16 @@ list(APPEND lib_srcs "${tbb_src_dir}/src/rml/client/rml_tbb.cpp")
 if (WIN32)
   add_definitions(-D__TBB_DYNAMIC_LOAD_ENABLED=0
                 /D__TBB_BUILD=1
+                /DTBB_NO_LEGACY=1
                 /D_UNICODE
                 /DUNICODE
                 /DWINAPI_FAMILY=WINAPI_FAMILY_APP
                 /DDO_ITT_NOTIFY=0
                 /DUSE_WINTHREAD
+                /D_WIN32_WINNT=0x0602
+                /D__TBB_WIN32_USE_CL_BUILTINS
                ) # defines were copied from windows.cl.inc
+
 set(CMAKE_LINKER_FLAGS "${CMAKE_LINKER_FLAGS} /APPCONTAINER")
 else()
   add_definitions(-D__TBB_DYNAMIC_LOAD_ENABLED=0         #required
@@ -183,10 +194,10 @@ set(TBB_SOURCE_FILES ${TBB_SOURCE_FILES} "${CMAKE_CURRENT_SOURCE_DIR}/${tbb_vers
 
 add_library(tbb ${TBB_SOURCE_FILES})
 
-if (WIN32)
+if (ARM AND WIN32)
   add_custom_command(TARGET tbb
                      PRE_BUILD
-                     COMMAND ${CMAKE_C_COMPILER} /nologo /TC /EP ${tbb_src_dir}\\src\\tbb\\win32-tbb-export.def /DTBB_NO_LEGACY /DUSE_WINTHREAD /D_CRT_SECURE_NO_DEPRECATE /D_WIN32_WINNT=0x0400 /D__TBB_BUILD=1 /I${tbb_src_dir}\\src /I${tbb_src_dir}\\include > "${tbb_src_dir}\\src\\tbb\\tbb.def"
+                     COMMAND ${CMAKE_C_COMPILER} /nologo /TC /EP ${tbb_src_dir}\\src\\tbb\\win32-tbb-export.def /DTBB_NO_LEGACY=1 /D_CRT_SECURE_NO_DEPRECATE /D__TBB_BUILD=1 /D_M_ARM=1 /I${tbb_src_dir}\\src /I${tbb_src_dir}\\include > "${tbb_src_dir}\\src\\tbb\\tbb.def"
                      WORKING_DIRECTORY ${tbb_src_dir}\\src\\tbb
                      COMMENT "Generating tbb.def file" VERBATIM
                     )
@@ -207,6 +218,7 @@ set_target_properties(tbb
   PROPERTIES OUTPUT_NAME tbb
   DEBUG_POSTFIX "${OPENCV_DEBUG_POSTFIX}"
   ARCHIVE_OUTPUT_DIRECTORY ${3P_LIBRARY_OUTPUT_PATH}
+  RUNTIME_OUTPUT_DIRECTORY ${EXECUTABLE_OUTPUT_PATH}
   )
 
 if(ENABLE_SOLUTION_FOLDERS)
