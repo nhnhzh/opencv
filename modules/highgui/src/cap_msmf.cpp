@@ -176,27 +176,27 @@ class ImageGrabber : public IMFSampleGrabberSinkCallback
 {
 public:
     ~ImageGrabber(void);
-    HRESULT initImageGrabber(IMFMediaSource *pSource, GUID VideoFormat);
+    HRESULT initImageGrabber(IMFMediaSource *pSource, GUID VideoFormat, double fps);
     HRESULT startGrabbing(void);
-    void pauseGrabbing();
-    void resumeGrabbing();
+    HRESULT resumeGrabbing();
     void stopGrabbing();
     RawImage *getRawImage();
     // Function of creation of the instance of the class
     static HRESULT CreateInstance(ImageGrabber **ppIG, unsigned int deviceID, bool synchronous = false);
 
     const HANDLE ig_hFrameReady;
-    const HANDLE ig_hFrameGrabbed;
     const HANDLE ig_hFinish;
 
 private:
     bool ig_RIE;
     bool ig_Close;
     bool ig_Synchronous;
+    double ig_Duration;
     long m_cRef;
     unsigned int ig_DeviceID;
     IMFMediaSource *ig_pSource;
     IMFMediaSession *ig_pSession;
+    IMFRateControl *ig_pRateControl;
     IMFTopology *ig_pTopology;
     RawImage *ig_RIFirst;
     RawImage *ig_RISecond;
@@ -209,6 +209,7 @@ private:
     IMFPresentationDescriptor *pPD,
     IMFStreamDescriptor *pSD,
     IMFTopologyNode **ppNode);
+    MFTIME ig_Position;
     HRESULT AddOutputNode(IMFTopology *pTopology, IMFActivate *pActivate, DWORD dwId, IMFTopologyNode **ppNode);
     // IUnknown methods
     STDMETHODIMP QueryInterface(REFIID iid, void** ppv);
@@ -234,7 +235,8 @@ class ImageGrabberThread
     friend DWORD WINAPI MainThreadFunction( LPVOID lpParam );
 public:
     ~ImageGrabberThread(void);
-    static HRESULT CreateInstance(ImageGrabberThread **ppIGT, IMFMediaSource *pSource, unsigned int deviceID, bool synchronious = false);
+    static HRESULT CreateInstance(ImageGrabberThread **ppIGT, IMFMediaSource *pSource, unsigned int deviceID,
+                                    double fps, bool synchronious);
     void start();
     void stop();
     void setEmergencyStopEvent(void *userData, void(*func)(int, void *));
@@ -242,7 +244,7 @@ public:
 protected:
     virtual void run();
 private:
-    ImageGrabberThread(IMFMediaSource *pSource, unsigned int deviceID, bool synchronious);
+    ImageGrabberThread(IMFMediaSource *pSource, unsigned int deviceID, double fps, bool synchronious);
     HANDLE igt_Handle;
     DWORD   igt_ThreadIdArray;
     ImageGrabber *igt_pImageGrabber;
@@ -893,12 +895,12 @@ ImageGrabber::ImageGrabber(unsigned int deviceID, bool synchronous):
     ig_DeviceID(deviceID),
     ig_pSource(NULL),
     ig_pSession(NULL),
+    ig_pRateControl(NULL),
     ig_pTopology(NULL),
     ig_RIE(true),
     ig_Close(false),
     ig_Synchronous(synchronous),
     ig_hFrameReady(synchronous ? CreateEvent(NULL, FALSE, FALSE, NULL): 0),
-    ig_hFrameGrabbed(synchronous ? CreateEvent(NULL, FALSE, TRUE, NULL): 0),
     ig_hFinish(CreateEvent(NULL, TRUE, FALSE, NULL))
 {}
 
@@ -916,17 +918,18 @@ ImageGrabber::~ImageGrabber(void)
     if (ig_Synchronous)
     {
         CloseHandle(ig_hFrameReady);
-        CloseHandle(ig_hFrameGrabbed);
     }
 
     SafeRelease(&ig_pSession);
     SafeRelease(&ig_pTopology);
+    SafeRelease(&ig_pRateControl);
+
     DebugPrintOut *DPO = &DebugPrintOut::getInstance();
 
     DPO->printOut(L"IMAGEGRABBER VIDEODEVICE %i: Destroing instance of the ImageGrabber class\n", ig_DeviceID);
 }
 
-HRESULT ImageGrabber::initImageGrabber(IMFMediaSource *pSource, GUID VideoFormat)
+HRESULT ImageGrabber::initImageGrabber(IMFMediaSource *pSource, GUID VideoFormat, double fps)
 {
     ComPtr<IMFActivate> pSinkActivate = NULL;
     ComPtr<IMFMediaType> pType = NULL;
@@ -943,7 +946,9 @@ HRESULT ImageGrabber::initImageGrabber(IMFMediaSource *pSource, GUID VideoFormat
     }
     SafeRelease(&ig_pSession);
     SafeRelease(&ig_pTopology);
+    SafeRelease(&ig_pRateControl);
     ig_pSource = pSource;
+    ig_Duration = 10000000/fps;
     hr = pSource->CreatePresentationDescriptor(&pPD);
     if (FAILED(hr))
     {
@@ -1001,12 +1006,15 @@ err:
     CHECK_HR(hr = pType->SetGUID(MF_MT_SUBTYPE, VideoFormat));
     // Create the sample grabber sink.
     CHECK_HR(hr = MFCreateSampleGrabberSinkActivate(pType.Get(), this, pSinkActivate.GetAddressOf()));
-    // To run as fast as possible, set this attribute (requires Windows 7):
-    CHECK_HR(hr = pSinkActivate->SetUINT32(MF_SAMPLEGRABBERSINK_IGNORE_CLOCK, TRUE));
+    // For Camera: To run as fast as possible, set this attribute (requires Windows 7)
+    // For Files: To enable scrubbing mode
+    if (!ig_Synchronous)
+        CHECK_HR(hr = pSinkActivate->SetUINT32(MF_SAMPLEGRABBERSINK_IGNORE_CLOCK, TRUE));
     // Create the Media Session.
     CHECK_HR(hr = MFCreateMediaSession(NULL, &ig_pSession));
     // Create the topology.
     CHECK_HR(hr = CreateTopology(pSource, pSinkActivate.Get(), &ig_pTopology));
+
 done:
     // Clean up.
     if (FAILED(hr))
@@ -1034,20 +1042,39 @@ HRESULT ImageGrabber::startGrabbing(void)
 {
     DebugPrintOut *DPO = &DebugPrintOut::getInstance();
     ComPtr<IMFMediaEvent> pEvent = NULL;
+    HRESULT hr = S_OK;
+
     PROPVARIANT var;
     PropVariantInit(&var);
-    HRESULT hr = S_OK;
     hr = ig_pSession->SetTopology(0, ig_pTopology);
     if (FAILED(hr))
     {
         printf("Error: cannot set topology (status %u)\n", hr);
     }
+
     DPO->printOut(L"IMAGEGRABBER VIDEODEVICE %i: Start Grabbing of the images\n", ig_DeviceID);
-    hr = ig_pSession->Start(&GUID_NULL, &var);
+
+    if (!ig_Synchronous)
+        hr = ig_pSession->Start(&GUID_NULL, &var);
+    else
+    {
+        // Init rate control if working with video files
+        ig_Position = 0;
+        CHECK_HR(hr = MFGetService(ig_pSession, MF_RATE_CONTROL_SERVICE, IID_PPV_ARGS(&ig_pRateControl)));
+        // Set the playback rate to zero without thinning.
+        CHECK_HR(hr = ig_pRateControl->SetRate(FALSE, 0.f));
+        //var.vt = VT_EMPTY;
+        //hr = ig_pSession->Start(&GUID_NULL, &var);
+    }
+
+    PropVariantClear(&var);
+
     if (FAILED(hr))
     {
         printf("Error: cannot start session (status %u)\n", hr);
+        return hr;
     }
+
     for(;;)
     {
         HRESULT hrStatus = S_OK;
@@ -1071,20 +1098,40 @@ HRESULT ImageGrabber::startGrabbing(void)
             hr = S_OK;
             goto done;
         }
+        printf("Media Foundation event %u with status %u\n", met, hrStatus);
+        if (met == MESessionStarted)
+        {
+            printf("Session started with code %u\n", hrStatus);
+            if (FAILED(hrStatus))
+            {
+                ig_pSession->Stop();
+                break;
+            }
+        }
+        if (met == MESessionRateChanged)
+        {
+            float rate;
+            ig_pRateControl->GetRate(FALSE, &rate);
+            printf("Rate changed. New rate: %f\n", rate);
+        }
+        if (met == MESessionScrubSampleComplete)
+        {
+            printf("Scrubbing event complited\n");
+        }
         if (met == MESessionEnded)
         {
-            DPO->printOut(L"IMAGEGRABBER VIDEODEVICE %i: MESessionEnded \n", ig_DeviceID);
+            DPO->printOut(L"IMAGEGRABBER VIDEODEVICE %i: MESessionEnded\n", ig_DeviceID);
             ig_pSession->Stop();
             break;
         }
         if (met == MESessionStopped)
         {
-            DPO->printOut(L"IMAGEGRABBER VIDEODEVICE %i: MESessionStopped \n", ig_DeviceID);
+            DPO->printOut(L"IMAGEGRABBER VIDEODEVICE %i: MESessionStopped\n", ig_DeviceID);
             break;
         }
         if (met == MEVideoCaptureDeviceRemoved)
         {
-            DPO->printOut(L"IMAGEGRABBER VIDEODEVICE %i: MEVideoCaptureDeviceRemoved \n", ig_DeviceID);
+            DPO->printOut(L"IMAGEGRABBER VIDEODEVICE %i: MEVideoCaptureDeviceRemoved\n", ig_DeviceID);
             break;
         }
         if ((met == MEError) || (met == MENonFatalError))
@@ -1094,7 +1141,7 @@ HRESULT ImageGrabber::startGrabbing(void)
             break;
         }
     }
-    DPO->printOut(L"IMAGEGRABBER VIDEODEVICE %i: Finish startGrabbing \n", ig_DeviceID);
+    DPO->printOut(L"IMAGEGRABBER VIDEODEVICE %i: Finish startGrabbing\n", ig_DeviceID);
 
 done:
     SetEvent(ig_hFinish);
@@ -1102,12 +1149,41 @@ done:
     return hr;
 }
 
-void ImageGrabber::pauseGrabbing()
+HRESULT ImageGrabber::resumeGrabbing()
 {
-}
+    PROPVARIANT var;
+    HRESULT hr;
+    static bool first = false;
+    printf("Resume grabbing\n");
 
-void ImageGrabber::resumeGrabbing()
-{
+    hr = ig_pRateControl->SetRate(FALSE, 0.f);
+    if (FAILED(hr))
+    {
+        printf("SetRate failed with status %u\n", hr);
+    }
+
+    PropVariantInit(&var);
+    if (first)
+    {
+        var.vt = VT_I8;
+        var.hVal.QuadPart = ig_Position;
+        //first = false;
+    }
+    else
+    {
+        var.vt = VT_EMPTY;
+    }
+    hr = ig_pSession->Start(NULL, &var);
+    if (FAILED(hr))
+    {
+        printf("Resume failed with status %u\n", hr);
+    }
+
+    PropVariantClear(&var);
+    ig_Position += ig_Duration; // 25 ms
+        //300000; // 30 miliseconds
+
+    return hr;
 }
 
 HRESULT ImageGrabber::CreateTopology(IMFMediaSource *pSource, IMFActivate *pSinkActivate, IMFTopology **ppTopo)
@@ -1289,17 +1365,15 @@ STDMETHODIMP ImageGrabber::OnProcessSample(REFGUID guidMajorMediaType, DWORD dwS
     (void)llSampleDuration;
     (void)dwSampleSize;
 
-    //printf("ImageGrabber::OnProcessSample() -- begin\n");
-    HANDLE tmp[] = {ig_hFinish, ig_hFrameGrabbed, NULL};
-
-    DWORD status = WaitForMultipleObjects(2, tmp, FALSE, INFINITE);
+    printf("ImageGrabber::OnProcessSample() -- begin\n");
+    DWORD status = WaitForSingleObject(ig_hFinish, 0);
     if (status == WAIT_OBJECT_0)
     {
         printf("OnProcessFrame called after ig_hFinish event\n");
         return S_OK;
     }
 
-    if(ig_RIE)
+    if (ig_RIE)
     {
         ig_RIFirst->fastCopy(pSampleBuffer);
         ig_RIOut = ig_RIFirst;
@@ -1310,7 +1384,7 @@ STDMETHODIMP ImageGrabber::OnProcessSample(REFGUID guidMajorMediaType, DWORD dwS
         ig_RIOut = ig_RISecond;
     }
 
-    //printf("ImageGrabber::OnProcessSample() -- end\n");
+    printf("ImageGrabber::OnProcessSample() -- end\n");
 
     if (ig_Synchronous)
     {
@@ -1342,10 +1416,10 @@ DWORD WINAPI MainThreadFunction( LPVOID lpParam )
     return 0;
 }
 
-HRESULT ImageGrabberThread::CreateInstance(ImageGrabberThread **ppIGT, IMFMediaSource *pSource, unsigned int deviceID, bool synchronious)
+HRESULT ImageGrabberThread::CreateInstance(ImageGrabberThread **ppIGT, IMFMediaSource *pSource, unsigned int deviceID, double fps, bool synchronious)
 {
     DebugPrintOut *DPO = &DebugPrintOut::getInstance();
-    *ppIGT = new (std::nothrow) ImageGrabberThread(pSource, deviceID, synchronious);
+    *ppIGT = new (std::nothrow) ImageGrabberThread(pSource, deviceID, fps, synchronious);
     if (ppIGT == NULL)
     {
         DPO->printOut(L"IMAGEGRABBERTHREAD VIDEODEVICE %i: Memory cannot be allocated\n", deviceID);
@@ -1356,7 +1430,7 @@ HRESULT ImageGrabberThread::CreateInstance(ImageGrabberThread **ppIGT, IMFMediaS
     return S_OK;
 }
 
-ImageGrabberThread::ImageGrabberThread(IMFMediaSource *pSource, unsigned int deviceID, bool synchronious):
+ImageGrabberThread::ImageGrabberThread(IMFMediaSource *pSource, unsigned int deviceID, double fps, bool synchronious):
     igt_func(NULL),
     igt_Handle(NULL),
     igt_stop(false)
@@ -1366,7 +1440,7 @@ ImageGrabberThread::ImageGrabberThread(IMFMediaSource *pSource, unsigned int dev
     igt_DeviceID = deviceID;
     if(SUCCEEDED(hr))
     {
-        hr = igt_pImageGrabber->initImageGrabber(pSource, MFVideoFormat_RGB24);
+        hr = igt_pImageGrabber->initImageGrabber(pSource, MFVideoFormat_RGB24, fps);
         if(!SUCCEEDED(hr))
         {
             DPO->printOut(L"IMAGEGRABBERTHREAD VIDEODEVICE %i: There is a problem with initialization of the instance of the ImageGrabber class\n", deviceID);
@@ -1969,7 +2043,7 @@ bool videoDevice::isFrameNew()
         if(vd_LockOut == OpenLock)
         {
             vd_LockOut = RawDataLock;
-            HRESULT hr = ImageGrabberThread::CreateInstance(&vd_pImGrTh, vd_pSource, vd_CurrentNumber);
+            HRESULT hr = ImageGrabberThread::CreateInstance(&vd_pImGrTh, vd_pSource, vd_CurrentNumber, 0, false);
             if(FAILED(hr))
             {
                 DebugPrintOut *DPO = &DebugPrintOut::getInstance();
@@ -2957,9 +3031,9 @@ bool CvCaptureCAM_MSMF::setProperty( int property_id, double value )
     }
     if ( handled ) {
         // a stream setting
-        if( width > 0 && height > 0 )
+        if ( width > 0 && height > 0 )
         {
-            if( width != (int)VI.getWidth(index) || height != (int)VI.getHeight(index) )//|| fourcc != VI.getFourcc(index) )
+            if ( width != (int)VI.getWidth(index) || height != (int)VI.getHeight(index) )//|| fourcc != VI.getFourcc(index) )
             {
                 // FIXME: implement method in VideoInput back end
                 // int fps = static_cast<int>(VI.getFPS(index));
@@ -3103,7 +3177,8 @@ bool CvCaptureFile_MSMF::open(const char* filename)
 
     if (SUCCEEDED(hr))
     {
-        hr = ImageGrabberThread::CreateInstance(&grabberThread, videoFileSource, (unsigned int)-2, true);
+        hr = ImageGrabberThread::CreateInstance(&grabberThread, videoFileSource, (unsigned int)-2,
+                getProperty(CV_CAP_PROP_FPS), true);
     }
 
     if (SUCCEEDED(hr))
@@ -3262,21 +3337,26 @@ double CvCaptureFile_MSMF::getProperty(int property_id)
         return ((double)captureFormats[captureFormatIndex].MF_MT_FRAME_RATE_NUMERATOR) /
             ((double)captureFormats[captureFormatIndex].MF_MT_FRAME_RATE_DENOMINATOR);
     }
- 
+
     return -1;
 }
 
 bool CvCaptureFile_MSMF::grabFrame()
 {
     DWORD waitResult = -1;
+    printf("Frame grabbing started\n");
     if (isOpened)
     {
-        SetEvent(grabberThread->getImageGrabber()->ig_hFrameGrabbed);
-        HANDLE tmp[] = {grabberThread->getImageGrabber()->ig_hFrameReady, grabberThread->getImageGrabber()->ig_hFinish, 0};
-        waitResult = WaitForMultipleObjects(2, tmp, FALSE, INFINITE);
+        if (!grabberThread->getImageGrabber()->getRawImage()->isNew())
+        {
+            HRESULT hr = grabberThread->getImageGrabber()->resumeGrabbing();
+            if (FAILED(hr))
+                return false;
+            HANDLE tmp[] = {grabberThread->getImageGrabber()->ig_hFrameReady, grabberThread->getImageGrabber()->ig_hFinish, 0};
+            waitResult = WaitForMultipleObjects(2, tmp, FALSE, INFINITE);
+        }
     }
-
-    return isOpened && grabberThread->getImageGrabber()->getRawImage()->isNew() && (waitResult == WAIT_OBJECT_0);
+    return isOpened; /*&& grabberThread->getImageGrabber()->getRawImage()->isNew() && (waitResult == WAIT_OBJECT_0);*/
 }
 
 IplImage* CvCaptureFile_MSMF::retrieveFrame(int)
@@ -3298,7 +3378,7 @@ IplImage* CvCaptureFile_MSMF::retrieveFrame(int)
 
     if(RIOut && size == RIOut->getSize())
     {
-         videoInput::processPixels(RIOut->getpPixels(), (unsigned char*)frame->imageData, width, 
+         videoInput::processPixels(RIOut->getpPixels(), (unsigned char*)frame->imageData, width,
              height, bytes, false, verticalFlip);
     }
 
