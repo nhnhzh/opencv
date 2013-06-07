@@ -55,24 +55,26 @@ int main( int argc, char** argv )
 
     Mat smoothed, laplace, result;
 
-    for(;;)
+	int nframes = cap.get(CV_CAP_PROP_FRAME_COUNT);
+
+	for(int i = 0; i < nframes; i++)
     {
         Mat frame;
         cap >> frame;
         if( frame.empty() )
             break;
 
-        int ksize = (sigma*5)|1;
-        if(smoothType == CV_GAUSSIAN)
-            GaussianBlur(frame, smoothed, Size(ksize, ksize), sigma, sigma);
-        else if(smoothType == CV_BLUR)
-            blur(frame, smoothed, Size(ksize, ksize));
-        else
-            medianBlur(frame, smoothed, ksize);
+		/*int ksize = (sigma*5)|1;
+		if(smoothType == CV_GAUSSIAN)
+			GaussianBlur(frame, smoothed, Size(ksize, ksize), sigma, sigma);
+		else if(smoothType == CV_BLUR)
+			blur(frame, smoothed, Size(ksize, ksize));
+		else
+			medianBlur(frame, smoothed, ksize);
 
-        Laplacian(smoothed, laplace, CV_16S, 5);
-        convertScaleAbs(laplace, result, (sigma+1)*0.25);
-        imshow("Laplacian", result);
+		Laplacian(smoothed, laplace, CV_16S, 5);
+		convertScaleAbs(laplace, result, (sigma+1)*0.25);*/
+        imshow("Laplacian", frame);
 
         int c = waitKey(30);
         if( c == ' ' )
