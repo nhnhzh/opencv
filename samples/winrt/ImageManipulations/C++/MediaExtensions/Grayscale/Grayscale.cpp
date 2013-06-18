@@ -47,11 +47,9 @@ NOTES ON THE MFT IMPLEMENTATION
 
 1. The MFT has fixed streams: One input stream and one output stream.
 
-2. The MFT supports the following formats: UYVY, YUY2, NV12.
+2. The MFT supports NV12 as input only.
 
 3. If the MFT is holding an input sample, SetInputType and SetOutputType both fail.
-
-4. The input and output types must be identical.
 
 5. If both types are set, no type can be set until the current type is cleared.
 
@@ -85,15 +83,8 @@ NOTES ON THE MFT IMPLEMENTATION
 // Video FOURCC codes.
 const DWORD FOURCC_NV12 = '21VN';
 
-// Static array of media types (preferred and accepted).
-const GUID g_MediaSubtypes[] =
-{
-    MFVideoFormat_NV12
-};
-
 HRESULT GetImageSize(DWORD fcc, UINT32 width, UINT32 height, DWORD* pcbImage);
 HRESULT GetDefaultStride(IMFMediaType *pType, LONG *plStride);
-bool ValidateRect(const RECT& rc);
 
 template <typename T>
 inline T clamp(const T& val, const T& minVal, const T& maxVal)
@@ -118,73 +109,6 @@ inline T clamp(const T& val, const T& minVal, const T& maxVal)
 // dwWidthInPixels   Frame width in pixels.
 // dwHeightInPixels  Frame height, in pixels.
 //-------------------------------------------------------------------
-
-// Convert NV12 image
-
-void TransformImage_NV12(
-    const D2D1::Matrix3x2F& mat,
-    const D2D_RECT_U& rcDest,
-    _Inout_updates_(_Inexpressible_(2 * lDestStride * dwHeightInPixels)) BYTE *pDest,
-    _In_ LONG lDestStride,
-    _In_reads_(_Inexpressible_(2 * lSrcStride * dwHeightInPixels)) const BYTE* pSrc,
-    _In_ LONG lSrcStride,
-    _In_ DWORD dwWidthInPixels,
-    _In_ DWORD dwHeightInPixels)
-{
-    // NV12 is planar: Y plane, followed by packed U-V plane.
-
-    // Y plane
-    for (DWORD y = 0; y < dwHeightInPixels; y++)
-    {
-        CopyMemory(pDest, pSrc, dwWidthInPixels);
-        pDest += lDestStride;
-        pSrc += lSrcStride;
-    }
-
-    // U-V plane
-
-    // NOTE: The U-V plane has 1/2 the number of lines as the Y plane.
-
-    // Lines above the destination rectangle.
-    DWORD y = 0;
-
-    const DWORD y0 = rcDest.bottom < dwHeightInPixels ? rcDest.bottom : dwHeightInPixels;
-
-    for ( ; y < rcDest.top/2; y++)
-    {
-        memcpy(pDest, pSrc, dwWidthInPixels);
-        pSrc += lSrcStride;
-        pDest += lDestStride;
-    }
-
-    // Lines within the destination rectangle.
-    for ( ; y < y0/2; y++)
-    {
-        for (DWORD x = 0; (x + 1) < dwWidthInPixels; x += 2)
-        {
-            if (x >= rcDest.left && x < rcDest.right)
-            {
-                pDest[x] = 0;
-                pDest[x+1] = 0;
-            }
-            else
-            {
-                pDest[x] = pSrc[x];
-                pDest[x+1] = pSrc[x+1];
-            }
-        }
-        pDest += lDestStride;
-        pSrc += lSrcStride;
-    }
-
-    // Lines below the destination rectangle.
-    for ( ; y < dwHeightInPixels/2; y++)
-    {
-        memcpy(pDest, pSrc, dwWidthInPixels);
-        pSrc += lSrcStride;
-        pDest += lDestStride;
-    }
-}
 
 CGrayscale::CGrayscale() :
     m_pSample(NULL), m_pInputType(NULL), m_pOutputType(NULL),
@@ -507,10 +431,15 @@ HRESULT CGrayscale::GetInputAvailableType(
     IMFMediaType    **ppType
 )
 {
+	HRESULT hr = S_OK;
+
     if (ppType == NULL)
     {
         return E_INVALIDARG;
     }
+
+	if (dwTypeIndex > 0)
+		return MF_E_NO_MORE_TYPES;
 
     EnterCriticalSection(&m_critSec);
 
@@ -520,23 +449,7 @@ HRESULT CGrayscale::GetInputAvailableType(
         return MF_E_INVALIDSTREAMNUMBER;
     }
 
-    HRESULT hr = S_OK;
-
-    // If the output type is set, return that type as our preferred input type.
-    if (m_pOutputType == NULL)
-    {
-        // The output type is not set. Create a partial media type.
-        hr = OnGetPartialType(dwTypeIndex, ppType);
-    }
-    else if (dwTypeIndex > 0)
-    {
-        hr = MF_E_NO_MORE_TYPES;
-    }
-    else
-    {
-        *ppType = m_pOutputType;
-        (*ppType)->AddRef();
-    }
+	hr = OnGetPartialType(MFVideoFormat_NV12, ppType);
 
     LeaveCriticalSection(&m_critSec);
     return hr;
@@ -555,10 +468,15 @@ HRESULT CGrayscale::GetOutputAvailableType(
     IMFMediaType    **ppType
 )
 {
+	HRESULT hr = S_OK;
+
     if (ppType == NULL)
     {
         return E_INVALIDARG;
     }
+
+	if (dwTypeIndex > 0)
+		return MF_E_NO_MORE_TYPES;
 
     EnterCriticalSection(&m_critSec);
 
@@ -568,25 +486,11 @@ HRESULT CGrayscale::GetOutputAvailableType(
         return MF_E_INVALIDSTREAMNUMBER;
     }
 
-    HRESULT hr = S_OK;
-
-    if (m_pInputType == NULL)
-    {
-        // The input type is not set. Create a partial media type.
-        hr = OnGetPartialType(dwTypeIndex, ppType);
-    }
-    else if (dwTypeIndex > 0)
-    {
-        hr = MF_E_NO_MORE_TYPES;
-    }
-    else
-    {
-        *ppType = m_pInputType;
-        (*ppType)->AddRef();
-    }
-
+	hr = OnGetPartialType(MFVideoFormat_NV12, ppType);
+ 
     LeaveCriticalSection(&m_critSec);
-    return hr;
+    
+	return hr;
 }
 
 
@@ -629,7 +533,7 @@ HRESULT CGrayscale::SetInputType(
     // Validate the type, if non-NULL.
     if (pType)
     {
-        hr = OnCheckInputType(pType);
+		hr = OnCheckMediaType(pType, MFVideoFormat_NV12);
         if (FAILED(hr))
         {
             goto done;
@@ -639,7 +543,8 @@ HRESULT CGrayscale::SetInputType(
     // The type is OK. Set the type, unless the caller was just testing.
     if (bReallySet)
     {
-        OnSetInputType(pType);
+		m_pInputType = pType;
+        UpdateFormatInfo(pType);
 
         // When the type changes, end streaming.
         hr = EndStreaming();
@@ -691,7 +596,7 @@ HRESULT CGrayscale::SetOutputType(
     // Validate the type, if non-NULL.
     if (pType)
     {
-        hr = OnCheckOutputType(pType);
+		hr = OnCheckMediaType(pType, MFVideoFormat_NV12);
         if (FAILED(hr))
         {
             goto done;
@@ -701,8 +606,7 @@ HRESULT CGrayscale::SetOutputType(
     // The type is OK. Set the type, unless the caller was just testing.
     if (bReallySet)
     {
-        OnSetOutputType(pType);
-
+		m_pOutputType = pType;
         // When the type changes, end streaming.
         hr = EndStreaming();
     }
@@ -1150,13 +1054,8 @@ done:
 // dwTypeIndex: Index into the list of peferred media types.
 // ppmt:        Receives a pointer to the media type.
 
-HRESULT CGrayscale::OnGetPartialType(DWORD dwTypeIndex, IMFMediaType **ppmt)
+HRESULT CGrayscale::OnGetPartialType(const GUID subType, IMFMediaType **ppmt)
 {
-    if (dwTypeIndex >= ARRAYSIZE(g_MediaSubtypes))
-    {
-        return MF_E_NO_MORE_TYPES;
-    }
-
     IMFMediaType *pmt = NULL;
 
     HRESULT hr = MFCreateMediaType(&pmt);
@@ -1171,7 +1070,7 @@ HRESULT CGrayscale::OnGetPartialType(DWORD dwTypeIndex, IMFMediaType **ppmt)
         goto done;
     }
 
-    hr = pmt->SetGUID(MF_MT_SUBTYPE, g_MediaSubtypes[dwTypeIndex]);
+	hr = pmt->SetGUID(MF_MT_SUBTYPE, subType);
     if (FAILED(hr))
     {
         goto done;
@@ -1185,72 +1084,10 @@ done:
     return hr;
 }
 
-
-// Validate an input media type.
-
-HRESULT CGrayscale::OnCheckInputType(IMFMediaType *pmt)
-{
-    assert(pmt != NULL);
-
-    HRESULT hr = S_OK;
-
-    // If the output type is set, see if they match.
-    if (m_pOutputType != NULL)
-    {
-        DWORD flags = 0;
-        hr = pmt->IsEqual(m_pOutputType, &flags);
-
-        // IsEqual can return S_FALSE. Treat this as failure.
-        if (hr != S_OK)
-        {
-            hr = MF_E_INVALIDMEDIATYPE;
-        }
-    }
-    else
-    {
-        // Output type is not set. Just check this type.
-        hr = OnCheckMediaType(pmt);
-    }
-    return hr;
-}
-
-
-// Validate an output media type.
-
-HRESULT CGrayscale::OnCheckOutputType(IMFMediaType *pmt)
-{
-    assert(pmt != NULL);
-
-    HRESULT hr = S_OK;
-
-    // If the input type is set, see if they match.
-    if (m_pInputType != NULL)
-    {
-        DWORD flags = 0;
-        hr = pmt->IsEqual(m_pInputType, &flags);
-
-        // IsEqual can return S_FALSE. Treat this as failure.
-        if (hr != S_OK)
-        {
-            hr = MF_E_INVALIDMEDIATYPE;
-        }
-
-    }
-    else
-    {
-        // Input type is not set. Just check this type.
-        hr = OnCheckMediaType(pmt);
-    }
-    return hr;
-}
-
-
 // Validate a media type (input or output)
 
-HRESULT CGrayscale::OnCheckMediaType(IMFMediaType *pmt)
+HRESULT CGrayscale::OnCheckMediaType(IMFMediaType *pmt, const GUID validType)
 {
-    BOOL bFoundMatchingSubtype = FALSE;
-
     // Major type must be video.
     GUID major_type;
     HRESULT hr = pmt->GetGUID(MF_MT_MAJOR_TYPE, &major_type);
@@ -1265,8 +1102,6 @@ HRESULT CGrayscale::OnCheckMediaType(IMFMediaType *pmt)
         goto done;
     }
 
-    // Subtype must be one of the subtypes in our global list.
-
     // Get the subtype GUID.
     GUID subtype;
     hr = pmt->GetGUID(MF_MT_SUBTYPE, &subtype);
@@ -1275,17 +1110,7 @@ HRESULT CGrayscale::OnCheckMediaType(IMFMediaType *pmt)
         goto done;
     }
 
-    // Look for the subtype in our list of accepted types.
-    for (DWORD i = 0; i < ARRAYSIZE(g_MediaSubtypes); i++)
-    {
-        if (subtype == g_MediaSubtypes[i])
-        {
-            bFoundMatchingSubtype = TRUE;
-            break;
-        }
-    }
-
-    if (!bFoundMatchingSubtype)
+	if (subtype != validType)
     {
         hr = MF_E_INVALIDMEDIATYPE; // The MFT does not support this subtype.
         goto done;
@@ -1301,45 +1126,6 @@ HRESULT CGrayscale::OnCheckMediaType(IMFMediaType *pmt)
 done:
     return hr;
 }
-
-
-// Set or clear the input media type.
-//
-// Prerequisite: The input type was already validated.
-
-void CGrayscale::OnSetInputType(IMFMediaType *pmt)
-{
-    // if pmt is NULL, clear the type.
-    // if pmt is non-NULL, set the type.
-
-    SafeRelease(&m_pInputType);
-    m_pInputType = pmt;
-    if (m_pInputType)
-    {
-        m_pInputType->AddRef();
-    }
-
-    // Update the format information.
-    UpdateFormatInfo();
-}
-
-
-// Set or clears the output media type.
-//
-// Prerequisite: The output type was already validated.
-
-void CGrayscale::OnSetOutputType(IMFMediaType *pmt)
-{
-    // If pmt is NULL, clear the type. Otherwise, set the type.
-
-    SafeRelease(&m_pOutputType);
-    m_pOutputType = pmt;
-    if (m_pOutputType)
-    {
-        m_pOutputType->AddRef();
-    }
-}
-
 
 // Initialize streaming parameters.
 //
@@ -1411,15 +1197,16 @@ HRESULT CGrayscale::OnProcessOutput(IMFMediaBuffer *pIn, IMFMediaBuffer *pOut)
         return hr;
     }
 
-    cv::Mat InputFrame(m_imageHeightInPixels + m_imageHeightInPixels/2, m_imageWidthInPixels, CV_8UC1, pSrc, lSrcStride);
+	cv::Mat InputFrame(m_imageHeightInPixels + m_imageHeightInPixels/2, m_imageWidthInPixels, CV_8UC1, pSrc, lSrcStride);
     cv::Mat InputGreyScale(InputFrame, cv::Range(0, m_imageHeightInPixels), cv::Range(0, m_imageWidthInPixels));
-    cv::Mat OutputFrame(m_imageHeightInPixels + m_imageHeightInPixels/2, m_imageWidthInPixels, CV_8UC1, pDest, lDestStride);
+	cv::Mat OutputFrame(m_imageHeightInPixels + m_imageHeightInPixels/2, m_imageWidthInPixels, CV_8UC1, pDest, lDestStride);
 
     switch (m_TransformType)
     {
     case Preview:
         {
-            InputFrame.copyTo(OutputFrame);
+			//cv::cvtColor(InputFrame, OutputFrame, CV_YUV2RGB_NV12);
+			InputFrame.copyTo(OutputFrame);
         } break;
     case GrayScale:
         {
@@ -1497,7 +1284,7 @@ HRESULT CGrayscale::OnFlush()
 // Update the format information. This method is called whenever the
 // input type is set.
 
-HRESULT CGrayscale::UpdateFormatInfo()
+HRESULT CGrayscale::UpdateFormatInfo(IMFMediaType* inputType)
 {
     HRESULT hr = S_OK;
 
@@ -1507,9 +1294,9 @@ HRESULT CGrayscale::UpdateFormatInfo()
     m_imageHeightInPixels = 0;
     m_cbImageSize = 0;
 
-    if (m_pInputType != NULL)
+    if (inputType != NULL)
     {
-        hr = m_pInputType->GetGUID(MF_MT_SUBTYPE, &subtype);
+        hr = inputType->GetGUID(MF_MT_SUBTYPE, &subtype);
         if (FAILED(hr))
         {
             goto done;
@@ -1520,14 +1307,15 @@ HRESULT CGrayscale::UpdateFormatInfo()
             goto done;
         }
 
-        hr = MFGetAttributeSize(m_pInputType, MF_MT_FRAME_SIZE, &m_imageWidthInPixels, &m_imageHeightInPixels);
+        hr = MFGetAttributeSize(inputType, MF_MT_FRAME_SIZE, &m_imageWidthInPixels, &m_imageHeightInPixels);
         if (FAILED(hr))
         {
             goto done;
         }
 
         // Calculate the image size (not including padding)
-        hr = GetImageSize(subtype.Data1, m_imageWidthInPixels, m_imageHeightInPixels, &m_cbImageSize);
+		m_cbImageSize = m_imageHeightInPixels*m_imageWidthInPixels*3;
+		//hr = GetImageSize(subtype.Data1, m_imageWidthInPixels, m_imageHeightInPixels, &m_cbImageSize);
     }
 
 done:
@@ -1612,25 +1400,4 @@ HRESULT GetDefaultStride(IMFMediaType *pType, LONG *plStride)
         *plStride = lStride;
     }
     return hr;
-}
-
-
-// Validate that a rectangle meets the following criteria:
-//
-//  - All coordinates are non-negative.
-//  - The rectangle is not flipped (top > bottom, left > right)
-//
-// These are the requirements for the destination rectangle.
-
-bool ValidateRect(const RECT& rc)
-{
-    if (rc.left < 0 || rc.top < 0)
-    {
-        return false;
-    }
-    if (rc.left > rc.right || rc.top > rc.bottom)
-    {
-        return false;
-    }
-    return true;
 }

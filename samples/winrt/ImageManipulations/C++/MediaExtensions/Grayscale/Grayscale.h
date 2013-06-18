@@ -217,17 +217,13 @@ private:
         return dwOutputStreamID == 0;
     }
 
-    HRESULT OnGetPartialType(DWORD dwTypeIndex, IMFMediaType **ppmt);
-    HRESULT OnCheckInputType(IMFMediaType *pmt);
-    HRESULT OnCheckOutputType(IMFMediaType *pmt);
-    HRESULT OnCheckMediaType(IMFMediaType *pmt);
-    void    OnSetInputType(IMFMediaType *pmt);
-    void    OnSetOutputType(IMFMediaType *pmt);
+    HRESULT OnGetPartialType(const GUID subType, IMFMediaType **ppmt);
+    HRESULT OnCheckMediaType(IMFMediaType *pmt, const GUID subType);
     HRESULT BeginStreaming();
     HRESULT EndStreaming();
     HRESULT OnProcessOutput(IMFMediaBuffer *pIn, IMFMediaBuffer *pOut);
     HRESULT OnFlush();
-    HRESULT UpdateFormatInfo();
+    HRESULT UpdateFormatInfo(IMFMediaType* inputType);
 
     CRITICAL_SECTION            m_critSec;
 
@@ -237,8 +233,8 @@ private:
     // Streaming
     bool                        m_bStreamingInitialized;
     IMFSample                   *m_pSample;                 // Input sample.
-    IMFMediaType                *m_pInputType;              // Input media type.
-    IMFMediaType                *m_pOutputType;             // Output media type.
+	IMFMediaType                *m_pInputType;              // Input media type
+	IMFMediaType                *m_pOutputType;             // Output media type
 
     // Fomat information
     UINT32                      m_imageWidthInPixels;

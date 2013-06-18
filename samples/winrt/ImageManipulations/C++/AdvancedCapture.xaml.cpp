@@ -17,7 +17,6 @@
 #include "AdvancedCapture.xaml.h"
 
 using namespace SDKSample::MediaCapture;
-
 using namespace Windows::UI::Xaml;
 using namespace Windows::UI::Xaml::Navigation;
 using namespace Windows::UI::Xaml::Data;
@@ -115,7 +114,7 @@ void AdvancedCapture::ScenarioReset()
 
 void AdvancedCapture::Failed(Windows::Media::Capture::MediaCapture ^currentCaptureObject, Windows::Media::Capture::MediaCaptureFailedEventArgs^ currentFailure)
 {
-    String ^message = "Fatal error" + currentFailure->Message;
+    String ^message = "Fatal error: " + currentFailure->Message;
     create_task(Dispatcher->RunAsync(Windows::UI::Core::CoreDispatcherPriority::High,
         ref new Windows::UI::Core::DispatchedHandler([this, message]()
     {
