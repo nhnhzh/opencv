@@ -58,6 +58,9 @@
 /* GTK+ 2.0 Thread support */
 #cmakedefine  HAVE_GTHREAD
 
+/* Windows Runtime support */
+#cmakedefine HAVE_WINRT
+
 /* Win32 UI */
 #cmakedefine HAVE_WIN32UI
 
